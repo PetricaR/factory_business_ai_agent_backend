@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # Maps MCP Server Deployment Script
@@ -15,18 +16,9 @@ NC='\033[0m' # No Color
 
 # Configuration
 PROJECT_ID="formare-ai"
-REGION="europe-west1"
-SERVICE_NAME="factory-ai-agent-competition-mcp-server"
-SERVICE_ACCOUNT_NAME="factory-comp-mcp-sa"
-
-# Load .env file if it exists
-if [ -f .env ]; then
-    echo -e "${BLUE}Loading environment variables from .env file...${NC}"
-    set -a  # automatically export all variables
-    source .env
-    set +a
-    echo -e "${GREEN}✓ Environment variables loaded${NC}"
-fi
+REGION="europe-west4"
+SERVICE_NAME="factory-ai-agent-mcp-server"
+SERVICE_ACCOUNT_NAME="factory-ai-agent-mcp-sa"
 
 # Helper functions
 log_info() {
@@ -70,10 +62,6 @@ validate_prerequisites() {
     fi
     log_success "Authenticated with gcloud"
     
-    # Get current user email
-    CURRENT_USER=$(gcloud auth list --filter=status:ACTIVE --format="value(account)")
-    log_success "Current user: ${CURRENT_USER}"
-    
     # Verify project exists and user has access
     if ! gcloud projects describe ${PROJECT_ID} &> /dev/null; then
         log_error "Cannot access project ${PROJECT_ID}"
@@ -86,8 +74,16 @@ validate_prerequisites() {
     if [ -z "${GOOGLE_MAPS_API_KEY:-}" ]; then
         log_error "GOOGLE_MAPS_API_KEY environment variable is not set"
         echo ""
-        echo -e "${YELLOW}Add it to your .env file:${NC}"
+        echo -e "${YELLOW}To set it, run:${NC}"
+        echo -e "  ${GREEN}export GOOGLE_MAPS_API_KEY='your-google-maps-api-key'${NC}"
+        echo ""
+        echo -e "${YELLOW}Or create a .env file with:${NC}"
         echo -e "  GOOGLE_MAPS_API_KEY=your-key"
+        echo -e "  API_KEY_TARGETARE=your-key"
+        echo -e "  GOOGLE_CUSTOM_SEARCH_API_KEY=your-key"
+        echo -e "  GOOGLE_CUSTOM_SEARCH_CX=your-search-engine-id"
+        echo ""
+        echo -e "Then run: ${GREEN}source .env${NC}"
         echo ""
         exit 1
     fi
@@ -96,8 +92,8 @@ validate_prerequisites() {
     if [ -z "${API_KEY_TARGETARE:-}" ]; then
         log_error "API_KEY_TARGETARE environment variable is not set"
         echo ""
-        echo -e "${YELLOW}Add it to your .env file:${NC}"
-        echo -e "  API_KEY_TARGETARE=your-key"
+        echo -e "${YELLOW}To set it, run:${NC}"
+        echo -e "  ${GREEN}export API_KEY_TARGETARE='your-api-key'${NC}"
         echo ""
         exit 1
     fi
@@ -106,8 +102,8 @@ validate_prerequisites() {
     if [ -z "${GOOGLE_CUSTOM_SEARCH_API_KEY:-}" ]; then
         log_error "GOOGLE_CUSTOM_SEARCH_API_KEY environment variable is not set"
         echo ""
-        echo -e "${YELLOW}Add it to your .env file:${NC}"
-        echo -e "  GOOGLE_CUSTOM_SEARCH_API_KEY=your-key"
+        echo -e "${YELLOW}To set it, run:${NC}"
+        echo -e "  ${GREEN}export GOOGLE_CUSTOM_SEARCH_API_KEY='your-google-custom-search-api-key'${NC}"
         echo ""
         exit 1
     fi
@@ -116,20 +112,32 @@ validate_prerequisites() {
     if [ -z "${GOOGLE_CUSTOM_SEARCH_CX:-}" ]; then
         log_error "GOOGLE_CUSTOM_SEARCH_CX environment variable is not set"
         echo ""
-        echo -e "${YELLOW}Add it to your .env file:${NC}"
-        echo -e "  GOOGLE_CUSTOM_SEARCH_CX=your-search-engine-id"
+        echo -e "${YELLOW}To set it, run:${NC}"
+        echo -e "  ${GREEN}export GOOGLE_CUSTOM_SEARCH_CX='your-search-engine-id'${NC}"
         echo ""
         exit 1
     fi
     log_success "GOOGLE_CUSTOM_SEARCH_CX is set"
     
     # Check if server.py exists
-    if [ ! -f "competition-mcp-server.py" ]; then
-        log_error "competition-mcp-server.py not found in current directory"
+    if [ ! -f "mcp-server.py" ]; then
+        log_error "mcp-server.py not found in current directory"
         exit 1
     fi
-    log_success "competition-mcp-server.py found"
-
+    log_success "mcp-server.py found"
+    
+    # Check if requirements.txt exists
+    if [ ! -f "requirements.txt" ]; then
+        log_warning "requirements.txt not found - creating one"
+        cat > requirements.txt << EOF
+fastmcp>=1.1.0
+googlemaps>=4.10.0
+httpx>=0.27.0
+EOF
+        log_success "requirements.txt created"
+    else
+        log_success "requirements.txt found"
+    fi
 }
 
 # Enable required APIs
@@ -140,7 +148,6 @@ enable_apis() {
     gcloud services enable \
         run.googleapis.com \
         cloudbuild.googleapis.com \
-        iam.googleapis.com \
         --project=${PROJECT_ID}
     
     log_success "APIs enabled"
@@ -152,34 +159,15 @@ setup_service_account() {
     
     local SA_EMAIL="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
     
-    # Check if service account exists
-    log_info "Checking if service account exists..."
-    if gcloud iam service-accounts describe ${SA_EMAIL} --project=${PROJECT_ID} &> /dev/null; then
-        log_warning "Service account already exists"
+    # Create service account
+    log_info "Creating service account..."
+    if gcloud iam service-accounts create ${SERVICE_ACCOUNT_NAME} \
+        --display-name="Maps MCP Server" \
+        --project=${PROJECT_ID} 2>/dev/null; then
+        log_success "Service account created"
     else
-        # Create service account
-        log_info "Creating service account..."
-        gcloud iam service-accounts create ${SERVICE_ACCOUNT_NAME} \
-            --display-name="Competition MCP Server" \
-            --project=${PROJECT_ID}
-        log_success "Service account created: ${SA_EMAIL}"
+        log_warning "Service account already exists (skipping)"
     fi
-    
-    # Grant the current user permission to act as the service account
-    log_info "Granting Service Account User role to ${CURRENT_USER}..."
-    gcloud iam service-accounts add-iam-policy-binding ${SA_EMAIL} \
-        --member="user:${CURRENT_USER}" \
-        --role="roles/iam.serviceAccountUser" \
-        --project=${PROJECT_ID}
-    log_success "Permission granted"
-    
-    # Grant the service account Cloud Run Invoker role
-    log_info "Granting Cloud Run Invoker role to service account..."
-    gcloud projects add-iam-policy-binding ${PROJECT_ID} \
-        --member="serviceAccount:${SA_EMAIL}" \
-        --role="roles/run.invoker" \
-        --condition=None
-    log_success "Service account configured"
 }
 
 # Deploy to Cloud Run
@@ -203,14 +191,14 @@ deploy_cloud_run() {
         --service-account=${SA_EMAIL} \
         --set-env-vars "${ENV_VARS}" \
         --project=${PROJECT_ID} \
-        --memory=32Gi \
+        --memory=16Gi \
         --cpu=8 \
         --gpu=1 \
         --gpu-type=nvidia-l4 \
         --no-gpu-zonal-redundancy \
         --timeout=300s \
         --concurrency=80 \
-        --min-instances=1 \
+        --min-instances=0 \
         --max-instances=3 \
         --no-cpu-throttling \
         --cpu-boost \
@@ -243,11 +231,11 @@ get_service_url() {
 
 # Display summary
 display_summary() {
-    section_header "DEPLOYMENT COMPLETE"
+    section_header "✅ DEPLOYMENT COMPLETE!"
     
     echo ""
     echo -e "${GREEN}MCP Server Details:${NC}"
-    echo "========================================"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo -e "Service Name:    ${SERVICE_NAME}"
     echo -e "Region:          ${REGION}"
     echo -e "Project:         ${PROJECT_ID}"
@@ -255,7 +243,7 @@ display_summary() {
     echo -e "SSE Endpoint:    ${MCP_SERVER_URL}/sse"
     echo ""
     echo -e "${YELLOW}Next Steps:${NC}"
-    echo "========================================"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "1. Test the MCP server:"
     echo "   gcloud run services proxy ${SERVICE_NAME} --region=${REGION} --port=8080"
     echo ""
@@ -269,14 +257,23 @@ display_summary() {
     echo "   gcloud run services update ${SERVICE_NAME} --region=${REGION} \\"
     echo "     --set-env-vars GOOGLE_MAPS_API_KEY=your_key"
     echo ""
+    
+    # Save to .env file
+    cat > .env << EOF
+# Generated by deploy.sh on $(date)
+PROJECT_ID="${PROJECT_ID}"
+REGION="${REGION}"
+MCP_SERVER_URL="${MCP_SERVER_URL}/sse"
+EOF
+    log_success "Configuration saved to .env file"
 }
 
 # Main execution
 main() {
     echo -e "${BLUE}"
-    echo "==========================================="
-    echo "   Competition MCP Server Deployment"
-    echo "==========================================="
+    echo "╔═══════════════════════════════════════╗"
+    echo "║     Maps MCP Server Deployment       ║"
+    echo "╚═══════════════════════════════════════╝"
     echo -e "${NC}"
     
     validate_prerequisites
@@ -287,7 +284,7 @@ main() {
     display_summary
     
     echo ""
-    log_success "All done!"
+    log_success "All done! 🎉"
 }
 
 # Run main function

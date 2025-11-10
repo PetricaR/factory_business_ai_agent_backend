@@ -6,8 +6,3 @@ httpx>=0.27.0
 googlemaps
 python-dotenv
 google-cloud-secret-manager
-aiohttp
-google-genai
-google-generativeai
-python-dotenv
-pandas

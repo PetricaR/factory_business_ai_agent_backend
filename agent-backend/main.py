@@ -76,6 +76,7 @@ try:
         session_service_uri=SESSION_SERVICE_URI,
         allow_origins=ALLOWED_ORIGINS,
         web=SERVE_WEB_INTERFACE,
+        trace_to_cloud=True,
     )
     
     logger.info(f"Successfully initialized ADK FastAPI app from {AGENT_DIR}")

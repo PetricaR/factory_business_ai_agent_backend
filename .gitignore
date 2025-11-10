@@ -207,3 +207,5 @@ marimo/_lsp/
 __marimo__/
 
 adk_env/agent-factory/agent_factory_ai/auth/formare-ai-gcp.json
+agent-backend/agent_factory_ai/auth/formare-ai-gcp.json
+agent-backend/auth/formare-ai-gcp.json
