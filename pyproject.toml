@@ -3,7 +3,7 @@ name = "factory-business-ai-agent-backend"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+python = ">=3.12"
 dependencies = [
     "fastapi>=0.121.1",
     "google-adk[a2a]>=1.18.0",
@@ -11,6 +11,7 @@ dependencies = [
     "google-auth-httplib2>=0.2.1",
     "google-cloud-aiplatform>=1.126.1",
     "httpx>=0.28.1",
+    "ipykernel>=7.1.0",
     "python-dotenv>=1.2.1",
     "toolbox-core>=0.5.2",
     "uvicorn[standard]>=0.38.0",

@@ -1,0 +1,246 @@
+"""
+Factory Finder AI - ADK Agent
+Uses MCP protocol to access Google Maps intelligence for location decisions
+"""
+
+import os
+import google.auth
+from google.auth.transport.requests import Request
+from google.oauth2 import id_token
+from typing import Dict, List, Any
+
+# Import ADK components
+from google.adk.agents import Agent
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StreamableHTTPConnectionParams, SseConnectionParams
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+# Configuration constants
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8080/mcp")
+MODEL = "gemini-live-2.5-flash-preview"
+IS_CLOUD_RUN = os.getenv("K_SERVICE") is not None
+
+
+def setup_vertex_ai_authentication():
+    """Set up Vertex AI authentication and environment variables."""
+    if not os.getenv("GOOGLE_GENAI_USE_VERTEXAI"):
+        os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "TRUE"
+    
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+    
+    if not project_id:
+        try:
+            _, project_id = google.auth.default()
+            if project_id:
+                os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+        except Exception as e:
+            print(f"Warning: Could not determine project ID: {e}")
+    
+    if not os.getenv("GOOGLE_CLOUD_LOCATION"):
+        os.environ["GOOGLE_CLOUD_LOCATION"] = location
+    
+    print(f"Vertex AI configuration:")
+    print(f"  Model: {MODEL}")
+    print(f"  Project: {os.getenv('GOOGLE_CLOUD_PROJECT', 'Not set')}")
+    print(f"  Location: {os.getenv('GOOGLE_CLOUD_LOCATION', 'Not set')}")
+
+
+def get_mcp_connection_params():
+    """Get MCP connection parameters with authentication if needed."""
+    headers = {}
+    
+    if IS_CLOUD_RUN:
+        print("Cloud Run detected - using authenticated connection")
+        try:
+            auth_req = Request()
+            target_audience = MCP_SERVER_URL.rsplit("/", 1)[0]
+            token = id_token.fetch_id_token(auth_req, target_audience)
+            headers = {"Authorization": f"Bearer {token}"}
+            print(f"Generated ID token for: {target_audience}")
+        except Exception as e:
+            print(f"Error generating ID token: {e}")
+    else:
+        print("Local development - using unauthenticated connection")
+    
+    # Determine connection type based on URL
+    if "/mcp" in MCP_SERVER_URL or not MCP_SERVER_URL.endswith("/sse"):
+        return StreamableHTTPConnectionParams(
+            url=MCP_SERVER_URL,
+            headers=headers,
+            timeout=60,
+        )
+    
+    return SseConnectionParams(
+        url=MCP_SERVER_URL,
+        headers=headers,
+        timeout=60,
+        sse_read_timeout=120,
+    )
+
+
+def create_factory_finder_agent():
+    """
+    Create the Factory Finder AI agent with MCP tools for location intelligence.
+    """
+    setup_vertex_ai_authentication()
+    
+    # MCP tools for Google Maps integration
+    tools = [MCPToolset(connection_params=get_mcp_connection_params())]
+    
+    agent = Agent(
+        name="factory_finder_agent",
+        model=MODEL,
+        description="Intelligent location finder for Factory by Raiffeisen Bank entrepreneurs",
+        instruction="""You are the Factory Finder AI, an expert location intelligence assistant for entrepreneurs 
+applying to Factory by Raiffeisen Bank's funding program in Romania.
+
+🎯 YOUR MISSION:
+Help entrepreneurs make data-driven decisions about WHERE to open their business by analyzing:
+- Competitor density and market saturation
+- Accessibility and demographics
+- Cost estimates and viability
+- Location-specific insights
+
+🛠️ YOUR TOOLS (via MCP Protocol):
+You have access to powerful Google Maps Platform tools:
+
+1. **search_locations_by_city**: Search for potential locations in a city
+   - Use when: User mentions a city or region
+   - Returns: Competitor analysis, market saturation, location candidates
+
+2. **analyze_competitor_density**: Deep dive into competitor analysis
+   - Use when: User wants to understand competition at a specific location
+   - Returns: Number of competitors, ratings, price levels, top competitors
+
+3. **calculate_accessibility_score**: Measure how accessible a location is
+   - Use when: User cares about accessibility from key points
+   - Returns: Travel times, distances, accessibility rating
+
+4. **get_location_details**: Get detailed info about a specific place
+   - Use when: User asks about a specific business or location
+   - Returns: Ratings, reviews, opening hours, contact info
+
+5. **geocode_address**: Convert address to coordinates
+   - Use when: User provides an address that needs coordinates
+   - Returns: Lat/lng coordinates, formatted address
+
+6. **reverse_geocode_coordinates**: Convert coordinates to address
+   - Use when: User provides coordinates
+   - Returns: Full address information
+
+7. **find_nearby_amenities**: Find facilities near a location
+   - Use when: User asks about banks, parking, transport, etc.
+   - Returns: List of nearby amenities with distances
+
+8. **compare_multiple_locations**: Side-by-side location comparison
+   - Use when: User is deciding between multiple locations
+   - Returns: Ranked comparison with scores and recommendations
+
+📊 HOW TO HELP ENTREPRENEURS:
+
+**For "Where should I open my business?" queries:**
+1. Ask for: Business type, preferred cities/regions, budget range
+2. Use `search_locations_by_city` for each candidate city
+3. Analyze results and explain market saturation levels
+4. Use `compare_multiple_locations` to rank options
+5. Provide clear recommendation with reasoning
+
+**For "Is this location good?" queries:**
+1. Get exact coordinates (use geocode_address if needed)
+2. Use `analyze_competitor_density` to assess competition
+3. Use `calculate_accessibility_score` for key reference points
+4. Use `find_nearby_amenities` for supporting infrastructure
+5. Provide comprehensive assessment with pros/cons
+
+**For business type specific analysis:**
+- **HoReCa (Restaurants, Cafes)**: Focus on foot traffic areas, tourist zones, competitor ratings
+- **Production/Manufacturing**: Focus on logistics, supplier proximity, transport access
+- **Retail**: Focus on shopping districts, parking, public transport
+- **Services (IT, Consulting)**: Focus on business districts, coworking spaces
+
+💡 COMMUNICATION STYLE:
+- Be conversational and friendly, but data-driven
+- Always explain WHY a location is good/bad (don't just give scores)
+- Use Romanian city names when discussing Romania
+- Provide actionable insights, not just numbers
+- When data shows high competition, suggest alternative neighborhoods
+- Always mention Factory by Raiffeisen Bank context when relevant
+
+📍 COMMON ROMANIAN CITIES (with coordinates):
+- București: 44.4268, 26.1025
+- Cluj-Napoca: 46.7712, 23.6236  
+- Timișoara: 45.7489, 21.2087
+- Iași: 47.1585, 27.6014
+- Constanța: 44.1598, 28.6348
+- Brașov: 45.6427, 25.5887
+- Sibiu: 45.7983, 24.1256
+- Craiova: 44.3302, 23.7949
+
+⚠️ IMPORTANT LIMITATIONS:
+- You CANNOT browse the web or search for real-time news
+- You CANNOT make direct API calls (only through MCP tools)
+- If user asks about non-location topics, politely redirect to location intelligence
+- Always verify coordinates make sense (latitude: 43-48 for Romania, longitude: 20-29)
+
+🎯 SUCCESS METRICS:
+Your goal is to help entrepreneurs:
+1. Avoid oversaturated markets (save them from failure)
+2. Find underserved areas with opportunity
+3. Make confident, data-backed location decisions
+4. Increase their chances of Factory funding approval
+
+Remember: You're not just analyzing data - you're helping real entrepreneurs make life-changing 
+business decisions. Be thorough, be honest, and be helpful!""",
+        tools=tools,
+    )
+    
+    return agent
+
+
+# Create the agent instance
+root_agent = create_factory_finder_agent()
+
+
+if __name__ == "__main__":
+    print("=" * 70)
+    print("Factory Finder AI - ADK Agent")
+    print("=" * 70)
+    print(f"Model: {MODEL}")
+    print(f"MCP Server URL: {MCP_SERVER_URL}")
+    print(f"Environment: {'Cloud Run' if IS_CLOUD_RUN else 'Local Development'}")
+    print(f"Project: {os.getenv('GOOGLE_CLOUD_PROJECT', 'Not set')}")
+    print("=" * 70)
+    print("AGENT CAPABILITIES:")
+    print("✓ Location search and analysis")
+    print("✓ Competitor density analysis")
+    print("✓ Accessibility scoring")
+    print("✓ Multi-location comparison")
+    print("✓ Nearby amenities search")
+    print("✓ Geocoding & reverse geocoding")
+    print("=" * 70)
+    print("SUPPORTED BUSINESS TYPES:")
+    print("  - HoReCa (Restaurants, Cafes, Bars)")
+    print("  - Production/Manufacturing")
+    print("  - Retail (Shops, Stores)")
+    print("  - Services (IT, Consulting)")
+    print("=" * 70)
+    print("MCP TOOLS INTEGRATION:")
+    print("  - 8 Google Maps Platform tools available")
+    print("  - Real-time location intelligence")
+    print("  - Data-driven recommendations")
+    print("=" * 70)
+    
+    # Verify authentication setup
+    try:
+        creds, project = google.auth.default()
+        print(f"✓ Authentication: Configured for project {project}")
+    except Exception as e:
+        print(f"✗ Authentication Error: {e}")
+        print("  Run: gcloud auth application-default login")
+    
+    print("=" * 70)
+    print("Agent ready! Deploy with: gcloud run deploy factory-finder-agent")
+    print("=" * 70)

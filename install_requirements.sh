@@ -30,5 +30,5 @@ uv lock
 # Sync environment
 echo "Syncing adk_env..."
 uv sync --active
-
+uv pip freeze > requirements_env.txt
 echo "All packages from '$REQ_FILE' have been installed and environment synced."

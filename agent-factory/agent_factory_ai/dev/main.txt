@@ -1,0 +1,54 @@
+"""
+FastAPI Application Entry Point for ADK Agent
+This file is required for Cloud Run deployment
+"""
+
+import os
+import uvicorn
+from fastapi import FastAPI
+from google.adk.cli.fast_api import get_fast_api_app
+
+# Get port from Cloud Run environment
+PORT = int(os.getenv("PORT", "8081"))
+
+# Get the directory where main.py is located
+AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Session service URI (using SQLite for local development)
+SESSION_SERVICE_URI = "sqlite:///./sessions.db"
+
+# CORS origins - restrict in production
+ALLOWED_ORIGINS = ["*"]
+
+# Enable web UI
+SERVE_WEB_INTERFACE = True
+
+# Create FastAPI app with ADK agent
+# Note: The parameter is session_service_uri, not session_db_url
+app: FastAPI = get_fast_api_app(
+    agents_dir=AGENT_DIR,
+    session_service_uri=SESSION_SERVICE_URI,
+    allow_origins=ALLOWED_ORIGINS,
+    web=SERVE_WEB_INTERFACE,
+)
+
+
+# Health check endpoint for Cloud Run
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Cloud Run"""
+    return {"status": "healthy", "service": "weather-agent"}
+
+
+# For local testing
+if __name__ == "__main__":
+    print(f"Starting Weather Agent on port {PORT}")
+    print(f"Web UI: http://localhost:{PORT}")
+    print(f"API Docs: http://localhost:{PORT}/docs")
+    
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=PORT,
+        log_level="info"
+    )
