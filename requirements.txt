@@ -1,0 +1,20 @@
+# Authentication for Cloud Run
+google-auth
+google-auth-httplib2
+
+# Google Cloud Services
+google-cloud-aiplatform
+
+# HTTP Client for MCP
+httpx
+
+# Web Server
+fastapi
+uvicorn[standard]
+
+# Utilities
+python-dotenv
+
+toolbox-core
+google-adk[a2a]
+a2a-server
