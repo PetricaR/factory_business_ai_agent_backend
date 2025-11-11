@@ -915,10 +915,11 @@ async def search_locations_by_city(city: str, business_type: str, radius_km: flo
         radius_meters = int(radius_km * 1000)
         
         # Search for businesses
-        places = await async_gmaps_places_nearby(
+        places = await asyncio.to_thread(
+            gmaps.places_nearby,
             location=(city_coords['lat'], city_coords['lng']),
             radius=radius_meters,
-            type=business_type
+            keyword=business_type  # 🔥 SCHIMBAT: type → keyword
         )
         
         results = []
@@ -967,12 +968,12 @@ async def analyze_competitor_density(latitude: float, longitude: float, business
         radius_meters = int(radius_km * 1000)
         
         # Search for competitors
-        places = await async_gmaps_places_nearby(
+        places = await asyncio.to_thread(
+            gmaps.places_nearby,
             location=(latitude, longitude),
             radius=radius_meters,
-            type=business_type
+            keyword=business_type  # 🔥 SCHIMBAT: type → keyword
         )
-        
         competitors = places.get('results', [])
         
         # Calculate metrics
