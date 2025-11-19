@@ -9,9 +9,9 @@ spec:
   selector:
     app: agent-factory-ai
   ports:
-    - name: http
-      port: 80
-      targetPort: 8080
-      protocol: TCP
-  # For Autopilot, you can also use ClusterIP and set up an Ingress
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  # For production with domain, you can use ClusterIP + Ingress instead:
   # type: ClusterIP

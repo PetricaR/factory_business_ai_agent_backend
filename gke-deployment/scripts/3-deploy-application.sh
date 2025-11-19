@@ -33,7 +33,7 @@ AR_LOCATION="${AR_LOCATION:-$REGION}"
 AR_REPOSITORY="${AR_REPOSITORY:-docker-repo}"
 
 # Build Configuration
-BUILD_CONTEXT="../agent-backend"
+BUILD_CONTEXT="../../agent-backend"
 DEPLOYMENT_DIR="../k8s"
 
 # =======================================

@@ -6,6 +6,7 @@
 gke-deployment/
 ├── README.md                    # Complete deployment guide
 ├── QUICKSTART.md               # 15-minute quick start
+├── INDEX.md                    # This file - package overview
 ├── config.env                  # Configuration file
 │
 ├── scripts/                    # Deployment scripts
@@ -14,8 +15,13 @@ gke-deployment/
 │   ├── 3-deploy-application.sh       # Deploy application
 │   └── utils.sh               # Management utilities
 │
+├── k8s/                       # Kubernetes manifests
+│   ├── deployment.yaml        # Application deployment
+│   └── service.yaml           # LoadBalancer service
+│
 └── docs/                      # Additional documentation
-    └── TROUBLESHOOTING.md     # Detailed troubleshooting guide
+    ├── END-TO-END-DEPLOYMENT.md   # Complete ADK deployment guide
+    └── TROUBLESHOOTING.md         # Detailed troubleshooting guide
 ```
 
 ## 🎯 What's Included
