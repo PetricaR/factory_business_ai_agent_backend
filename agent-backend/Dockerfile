@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM --platform=linux/amd64 python:3.11-slim
 
 WORKDIR /app
 
@@ -21,6 +21,6 @@ ENV PORT=8080
 
 EXPOSE 8080
 
-# Run the FastAPI app using main.py
-# This is the CORRECT way for Cloud Run
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run using python -m instead of uvicorn binary
+# This avoids exec format errors on multi-arch builds
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

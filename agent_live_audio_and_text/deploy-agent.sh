@@ -103,16 +103,16 @@ echo -e "${YELLOW}⏳${NC} This takes 2-4 minutes..."
 set +e
 DEPLOY_OUTPUT=$(gcloud run deploy ${AGENT_SERVICE_NAME} \
     --source . \
-    --region=${REGION} \
+    --region=europe-west1 \
     --platform=managed \
     --no-allow-unauthenticated \
     --service-account=${AGENT_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com \
     --set-env-vars "MCP_SERVER_URL=${MCP_SERVER_URL},MODEL=gemini-2.5-flash,GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION}" \
     --memory=16Gi \
     --cpu=8 \
-    # --gpu=1 \
-    # --gpu-type=nvidia-l4 \
-    # --no-gpu-zonal-redundancy \
+    --gpu=1 \
+    --gpu-type=nvidia-l4 \
+    --no-gpu-zonal-redundancy \
     --timeout=300s \
     --concurrency=80 \
     --min-instances=1 \
