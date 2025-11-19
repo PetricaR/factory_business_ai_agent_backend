@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-audio-text
+  labels:
+    app: agent-audio-text
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agent-audio-text
+  template:
+    metadata:
+      labels:
+        app: agent-audio-text
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: agent-audio-text
+        image: IMAGE_URL_PLACEHOLDER
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8080"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-audio-text
+  labels:
+    app: agent-audio-text
+spec:
+  type: LoadBalancer
+  selector:
+    app: agent-audio-text
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
