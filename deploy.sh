@@ -39,7 +39,8 @@ SERVICE_FILE="k8s/service.yaml"
 BUILD_CONTEXT="./agent-backend"
 
 # ========================================
-# Helper Functions
+# Helper Function
+
 # ========================================
 
 print_info() {
